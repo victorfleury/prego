@@ -156,20 +156,37 @@ func publish_pr() {
 	token := get_token()
 	repo_url := get_repo_url()
 
-	//payload := build_payload_request(PR_TEMPLATE, destination_branch, title, DEFAULT_REVIEWERS)
+	reviewers_payload_data := build_reviewers_payload_data(reviewers)
+
+	fmt.Println(reviewers_payload_data)
+	fmt.Println(destination_branch)
+
+	repo, _ := get_repo()
+	head_ref, _ := repo.Head()
+	title, _ := repo.CommitObject(head_ref.Hash())
+
+	fmt.Println(PR_TEMPLATE)
+	fmt.Println(destination_branch)
+	fmt.Println(title.Message)
+	fmt.Println(reviewers_payload_data)
+
+	build_payload_request(PR_TEMPLATE, destination_branch, title.Message, reviewers_payload_data)
+	//fmt.Println(payload)
 	log.Println("Repo URL is ", repo_url)
 	log.Println("Token is ", token)
 	log.Println("Published PR successfully !")
 
 }
 
-func reviewers_payload_data(reviewers []string) {
+func build_reviewers_payload_data(reviewers []string) []map[string]map[string]string {
 	var selected_reviewers []map[string]map[string]string
 
 	for _, reviewer := range reviewers {
-		payload_reviewer := make(map[string]map[string]string{"user": {"name": reviewer}})
+		payload_reviewer := map[string]map[string]string{"user": {"name": reviewer}}
 		selected_reviewers = append(selected_reviewers, payload_reviewer)
 	}
+
+	return selected_reviewers
 }
 
 func get_token() string {
@@ -221,7 +238,7 @@ func build_payload_request(description, destination_branch, title string, review
 	data := map[string]interface{}{
 		"description": description,
 		"toRef": map[string]interface{}{
-			"id": destination_branch,
+			"id": fmt.Sprintf("refs/heads/%s", destination_branch),
 		},
 		"state":     "OPEN",
 		"title":     title,
