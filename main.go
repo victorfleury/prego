@@ -17,9 +17,11 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
+
 	//"os/exec"
 	"strings"
 	"time"
@@ -32,6 +34,16 @@ import (
 
 const URL_TEMPLATE string = "https://bitbucket.rodeofx.com/rest/api/1.0/projects/%s/repos/%s/pull-requests"
 
+type Reviewer struct {
+	Name string
+}
+
+var (
+	destination_branch string
+	title              string
+	url                string
+	reviewers          []string
+)
 var DEFAULT_REVIEWERS = []map[string]map[string]string{
 	{"user": {"name": "bramoul"}},
 	{"user": {"name": "agjolly"}},
@@ -65,9 +77,7 @@ func main() {
 	}
 
 	// Branches
-	var destination_branch string
-	//cmd := exec.Command("git", "branch", "--all")
-	//branches, err := cmd.Output()
+	//var destination_branch string
 
 	branches, err := repo.Branches()
 	if err != nil {
@@ -97,7 +107,6 @@ func main() {
 	}
 
 	// Reviewers
-	var reviewers []string
 	reviewers_option := make([]huh.Option[string], len(DEFAULT_REVIEWERS))
 	for i, reviewer := range DEFAULT_REVIEWERS {
 		reviewers_option[i] = huh.NewOption(reviewer["user"]["name"], reviewer["user"]["name"]).Selected(true)
@@ -115,10 +124,10 @@ func main() {
 		),
 		huh.NewGroup(
 			huh.NewMultiSelect[string]().
-				Value(&reviewers).
 				Title("Select reviewers").
 				Description("Pick which team members should review your PR").
-				Options(reviewers_option...),
+				Options(reviewers_option...).
+				Value(&reviewers),
 		),
 		huh.NewGroup(
 			huh.NewText().
@@ -145,20 +154,27 @@ func publish_pr() {
 
 	log.Println("Fetching token")
 	token := get_token()
-	repo_url, err := get_repo_url()
-	if err != nil {
-		log.Fatal("Could not retrieve the repo URL")
-	}
+	repo_url := get_repo_url()
+
+	//payload := build_payload_request(PR_TEMPLATE, destination_branch, title, DEFAULT_REVIEWERS)
 	log.Println("Repo URL is ", repo_url)
 	log.Println("Token is ", token)
 	log.Println("Published PR successfully !")
 
 }
 
+func reviewers_payload_data(reviewers []string) {
+	var selected_reviewers []map[string]map[string]string
+
+	for _, reviewer := range reviewers {
+		payload_reviewer := make(map[string]map[string]string{"user": {"name": reviewer}})
+		selected_reviewers = append(selected_reviewers, payload_reviewer)
+	}
+}
+
 func get_token() string {
 
 	token_path := os.Getenv("HOME") + "/token.tk"
-	fmt.Println("Token path is ", token_path)
 	token, err := os.ReadFile(token_path)
 	if err != nil {
 		log.Fatal("Panic ! No token found")
@@ -169,11 +185,9 @@ func get_token() string {
 func get_repo() (*git.Repository, error) {
 	current_directory, err := os.Getwd()
 	if err != nil {
-		fmt.Println("Current directory could not be found?")
+		log.Fatal("Current directory could not be found?")
 	}
-	fmt.Println("Current directory is", current_directory)
 
-	//repo, err := git.PlainOpen(current_directory)
 	options := git.PlainOpenOptions{DetectDotGit: true}
 	repo, err := git.PlainOpenWithOptions(current_directory, &options)
 	if err != nil {
@@ -192,7 +206,6 @@ func get_repo_url() string {
 	remote := remotes[0]
 	config_url := remote.Config().URLs[0]
 
-	fmt.Println("---> Config url", config_url)
 	parts := strings.Split(config_url, "/")
 	project, slug_name := parts[len(parts)-2], parts[len(parts)-1]
 
@@ -201,4 +214,23 @@ func get_repo_url() string {
 	log.Println(formatted_url)
 
 	return formatted_url
+}
+
+func build_payload_request(description, destination_branch, title string, reviewers []map[string]map[string]string) {
+
+	data := map[string]interface{}{
+		"description": description,
+		"toRef": map[string]interface{}{
+			"id": destination_branch,
+		},
+		"state":     "OPEN",
+		"title":     title,
+		"reviewers": reviewers,
+	}
+
+	json_payload, err := json.Marshal(data)
+	if err != nil {
+		log.Fatal("Could not build JSON payload for creating PR.")
+	}
+	fmt.Printf("%s\n", json_payload)
 }
