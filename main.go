@@ -5,24 +5,25 @@
 
 - Default reviewers :
   - Use a map for reviewers -> OK
-  - Read from a JSON config file
-  - Add cli arg to remove them altogether
+  - Read from a JSON config file -> TODO
+  - Add cli arg to remove them altogether -> TODO
 
 - Use Go Git package -> OK
 - Read Token from file -> OK
-- Build payload for POST request
+- Build payload for POST request -> Wip need to add the HEADERs
 - Execute payload successfully
 *
 */
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 
-	//"os/exec"
+	"net/http"
 	"strings"
 	"time"
 
@@ -34,6 +35,9 @@ import (
 
 const URL_TEMPLATE string = "https://bitbucket.rodeofx.com/rest/api/1.0/projects/%s/repos/%s/pull-requests"
 
+const USER_URL_TEMPLATE = "https://bitbucket.rodeofx.com/rest/api/1.0/users/vfleury/repos/hom_repo/pull_requests"
+
+// fmt.Println(json_payload)
 type Reviewer struct {
 	Name string
 }
@@ -153,28 +157,27 @@ func publish_pr() {
 	time.Sleep(1 * time.Second)
 
 	log.Println("Fetching token")
-	token := get_token()
+	//token := get_token()
 	repo_url := get_repo_url()
 
 	reviewers_payload_data := build_reviewers_payload_data(reviewers)
-
-	fmt.Println(reviewers_payload_data)
-	fmt.Println(destination_branch)
 
 	repo, _ := get_repo()
 	head_ref, _ := repo.Head()
 	title, _ := repo.CommitObject(head_ref.Hash())
 
-	fmt.Println(PR_TEMPLATE)
-	fmt.Println(destination_branch)
-	fmt.Println(title.Message)
-	fmt.Println(reviewers_payload_data)
-
-	build_payload_request(PR_TEMPLATE, destination_branch, title.Message, reviewers_payload_data)
-	//fmt.Println(payload)
-	log.Println("Repo URL is ", repo_url)
-	log.Println("Token is ", token)
-	log.Println("Published PR successfully !")
+	json_payload := build_payload_request(
+		PR_TEMPLATE,
+		destination_branch,
+		title.Message,
+		reviewers_payload_data,
+	)
+	result := publish_pr_request(repo_url, json_payload)
+	if result {
+		fmt.Println("Success !")
+	} else {
+		log.Fatal("Could not publish PR ...")
+	}
 
 }
 
@@ -217,23 +220,24 @@ func get_repo() (*git.Repository, error) {
 func get_repo_url() string {
 	repo, _ := get_repo()
 	remotes, err := repo.Remotes()
-	if err != nil {
+	if err != nil || len(remotes) == 0 {
 		log.Fatal("Repository has no remote...")
 	}
+	//fmt.Println("Remotes", remotes)
 	remote := remotes[0]
 	config_url := remote.Config().URLs[0]
 
 	parts := strings.Split(config_url, "/")
 	project, slug_name := parts[len(parts)-2], parts[len(parts)-1]
 
-	formatted_url := fmt.Sprintf(URL_TEMPLATE, project, slug_name)
+	formatted_url := fmt.Sprintf(URL_TEMPLATE, project, strings.Split(slug_name, ".git")[0])
 
 	log.Println(formatted_url)
 
 	return formatted_url
 }
 
-func build_payload_request(description, destination_branch, title string, reviewers []map[string]map[string]string) {
+func build_payload_request(description, destination_branch, title string, reviewers []map[string]map[string]string) []byte {
 
 	data := map[string]interface{}{
 		"description": description,
@@ -249,5 +253,33 @@ func build_payload_request(description, destination_branch, title string, review
 	if err != nil {
 		log.Fatal("Could not build JSON payload for creating PR.")
 	}
-	fmt.Printf("%s\n", json_payload)
+	log.Printf("Payload: %s\n", json_payload)
+	return json_payload
+}
+
+func publish_pr_request(url string, json_payload []byte) bool {
+
+	log.Println("Publishing to ", url)
+	json_data, err := json.Marshal(json_payload)
+	if err != nil {
+		log.Fatal("Could not marshal json_payload")
+	}
+
+	client := http.Client{}
+	req, err := http.NewRequest("POST", url, bytes.NewReader(json_data))
+
+	req.Header = http.Header{
+		"content-type":  {"application/json"},
+		"authorization": {fmt.Sprintf("Bearer %s", get_token())},
+	}
+	fmt.Println("HEADER :", req.Header)
+	res, err := client.Do(req)
+	if err != nil {
+		log.Fatal("Could not publish PR ...", err)
+	}
+
+	defer res.Body.Close()
+	fmt.Println(res.Status)
+
+	return true
 }
