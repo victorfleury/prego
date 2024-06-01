@@ -150,7 +150,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	_ = spinner.New().Title("Publishing PR...").Accessible(true).Action(publish_pr).Run()
+	_ = spinner.New().Title("Publishing PR...").Accessible(false).Action(publish_pr).Run()
 }
 
 func publish_pr() {
