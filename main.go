@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
 
@@ -116,6 +117,8 @@ func main() {
 		reviewers_option[i] = huh.NewOption(reviewer["user"]["name"], reviewer["user"]["name"]).Selected(true)
 	}
 
+	var confirm bool
+
 	form := huh.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().
@@ -139,7 +142,7 @@ func main() {
 				Title("PR Description").
 				Lines(15).
 				Description("Content of the PR"),
-			huh.NewConfirm().Title("Publish PR").Affirmative("Yes !").Negative("Cancel"),
+			huh.NewConfirm().Title("Publish PR").Affirmative("Yes !").Negative("Cancel").Value(&confirm),
 		),
 	)
 
@@ -148,6 +151,11 @@ func main() {
 	if err != nil {
 		fmt.Println("Uh oh:", err)
 		os.Exit(1)
+	}
+
+	if !confirm {
+		log.Println("Publish PR aborted...")
+		os.Exit(0)
 	}
 
 	_ = spinner.New().Title("Publishing PR...").Accessible(false).Action(publish_pr).Run()
@@ -199,7 +207,7 @@ func get_token() string {
 	if err != nil {
 		log.Fatal("Panic ! No token found")
 	}
-	return string(token)
+	return strings.Trim(string(token), "\n")
 }
 
 func get_repo() (*git.Repository, error) {
@@ -279,7 +287,13 @@ func publish_pr_request(url string, json_payload []byte) bool {
 	}
 
 	defer res.Body.Close()
-	fmt.Println(res.Status)
+	body, err := io.ReadAll(res.Body)
+	fmt.Println(string([]byte(body)))
 
-	return true
+	if res.StatusCode == 200 {
+		return true
+	} else {
+		return false
+	}
+
 }
