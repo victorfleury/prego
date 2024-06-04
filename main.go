@@ -36,7 +36,7 @@ import (
 
 const URL_TEMPLATE string = "https://bitbucket.rodeofx.com/rest/api/1.0/projects/%s/repos/%s/pull-requests"
 
-const USER_URL_TEMPLATE = "https://bitbucket.rodeofx.com/rest/api/1.0/users/vfleury/repos/hom_repo/pull_requests"
+const USER_URL_TEMPLATE = "https://bitbucket.rodeofx.com/rest/api/1.0/users/vfleury/repos/home_repo/pull_requests"
 
 // fmt.Println(json_payload)
 type Reviewer struct {
@@ -82,7 +82,6 @@ func main() {
 	}
 
 	// Branches
-	//var destination_branch string
 
 	branches, err := repo.Branches()
 	if err != nil {
@@ -95,7 +94,7 @@ func main() {
 		branch_names = append(branch_names, short_name)
 		return nil
 	})
-	//branch_names := strings.Split(string(branches), "\n")
+
 	var branch_names_cleaned []string
 	for _, b := range branch_names {
 		if b != "" {
@@ -176,6 +175,7 @@ func publish_pr() {
 
 	json_payload := build_payload_request(
 		PR_TEMPLATE,
+		string(head_ref.Name()),
 		destination_branch,
 		title.Message,
 		reviewers_payload_data,
@@ -240,15 +240,19 @@ func get_repo_url() string {
 
 	formatted_url := fmt.Sprintf(URL_TEMPLATE, project, strings.Split(slug_name, ".git")[0])
 
-	log.Println(formatted_url)
+	log.Println("Formattted url :", formatted_url)
 
 	return formatted_url
+	//return USER_URL_TEMPLATE
 }
 
-func build_payload_request(description, destination_branch, title string, reviewers []map[string]map[string]string) []byte {
+func build_payload_request(description, source_branch, destination_branch, title string, reviewers []map[string]map[string]string) []byte {
 
 	data := map[string]interface{}{
 		"description": description,
+		"fromRef": map[string]interface{}{
+			"id": source_branch,
+		},
 		"toRef": map[string]interface{}{
 			"id": fmt.Sprintf("refs/heads/%s", destination_branch),
 		},
@@ -268,32 +272,28 @@ func build_payload_request(description, destination_branch, title string, review
 func publish_pr_request(url string, json_payload []byte) bool {
 
 	log.Println("Publishing to ", url)
-	json_data, err := json.Marshal(json_payload)
-	if err != nil {
-		log.Fatal("Could not marshal json_payload")
-	}
 
 	client := http.Client{}
-	req, err := http.NewRequest("POST", url, bytes.NewReader(json_data))
+	req, err := http.NewRequest("POST", url, bytes.NewReader(json_payload))
 
 	req.Header = http.Header{
 		"content-type":  {"application/json"},
 		"authorization": {fmt.Sprintf("Bearer %s", get_token())},
 	}
-	fmt.Println("HEADER :", req.Header)
 	res, err := client.Do(req)
 	if err != nil {
 		log.Fatal("Could not publish PR ...", err)
 	}
-
 	defer res.Body.Close()
-	body, err := io.ReadAll(res.Body)
-	fmt.Println(string([]byte(body)))
 
-	if res.StatusCode == 200 {
+	body, err := io.ReadAll(res.Body)
+	log.Println("Request :", res.Request)
+	log.Println("Status code of the request :", res.StatusCode)
+	log.Println("Body : ", string(body))
+
+	if res.StatusCode == 201 {
 		return true
 	} else {
 		return false
 	}
-
 }
