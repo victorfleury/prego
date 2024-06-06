@@ -20,13 +20,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"os"
 
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/huh/spinner"
@@ -36,9 +34,6 @@ import (
 
 const URL_TEMPLATE string = "https://bitbucket.rodeofx.com/rest/api/1.0/projects/%s/repos/%s/pull-requests"
 
-const USER_URL_TEMPLATE = "https://bitbucket.rodeofx.com/rest/api/1.0/users/vfleury/repos/home_repo/pull_requests"
-
-// fmt.Println(json_payload)
 type Reviewer struct {
 	Name string
 }
@@ -76,13 +71,13 @@ var PR_TEMPLATE string = `#### Purpose of the PR
 
 func main() {
 
+	//parse_config()
 	repo, err := get_repo()
 	if err != nil {
 		log.Fatal("Prego needs to be run in a Git repository !")
 	}
 
 	// Branches
-
 	branches, err := repo.Branches()
 	if err != nil {
 		log.Fatal("No branches found. Are you in a properly initialized repository?")
@@ -140,6 +135,7 @@ func main() {
 				Value(&PR_TEMPLATE).
 				Title("PR Description").
 				Lines(15).
+				CharLimit(5000).
 				Description("Content of the PR"),
 			huh.NewConfirm().Title("Publish PR").Affirmative("Yes !").Negative("Cancel").Value(&confirm),
 		),
@@ -161,28 +157,27 @@ func main() {
 }
 
 func publish_pr() {
-	time.Sleep(1 * time.Second)
 
 	log.Println("Fetching token")
-	//token := get_token()
 	repo_url := get_repo_url()
 
 	reviewers_payload_data := build_reviewers_payload_data(reviewers)
 
 	repo, _ := get_repo()
 	head_ref, _ := repo.Head()
-	title, _ := repo.CommitObject(head_ref.Hash())
+	commit_message, _ := repo.CommitObject(head_ref.Hash())
+	title := strings.Split(commit_message.Message, "\n")[0]
 
 	json_payload := build_payload_request(
 		PR_TEMPLATE,
 		string(head_ref.Name()),
 		destination_branch,
-		title.Message,
+		title,
 		reviewers_payload_data,
 	)
 	result := publish_pr_request(repo_url, json_payload)
 	if result {
-		fmt.Println("Success !")
+		log.Println("Success !")
 	} else {
 		log.Fatal("Could not publish PR ...")
 	}
@@ -286,14 +281,33 @@ func publish_pr_request(url string, json_payload []byte) bool {
 	}
 	defer res.Body.Close()
 
-	body, err := io.ReadAll(res.Body)
 	log.Println("Request :", res.Request)
 	log.Println("Status code of the request :", res.StatusCode)
-	log.Println("Body : ", string(body))
 
 	if res.StatusCode == 201 {
 		return true
 	} else {
 		return false
 	}
+}
+
+func parse_config() {
+	root_path_to_config := os.Getenv("XDG_CONFIG_HOME")
+	fmt.Println("Root path", root_path_to_config)
+	if root_path_to_config == "" {
+		root_path_to_config = os.Getenv("HOME") + "/.config"
+	}
+
+	log.Println("Root path to config", root_path_to_config)
+	path_to_config := root_path_to_config + "/prego.json"
+	log.Println("Path to config", path_to_config)
+
+	config, err := os.ReadFile(path_to_config)
+	if err != nil {
+		log.Println("Could not read the config file at ", path_to_config)
+	}
+
+	fmt.Println(config)
+
+	os.Exit(1)
 }
