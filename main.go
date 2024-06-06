@@ -34,8 +34,9 @@ import (
 
 const URL_TEMPLATE string = "https://bitbucket.rodeofx.com/rest/api/1.0/projects/%s/repos/%s/pull-requests"
 
-type Reviewer struct {
-	Name string
+type ConfigPayload struct {
+	Editor            string
+	Default_reviewers []map[string]map[string]string
 }
 
 var (
@@ -71,7 +72,7 @@ var PR_TEMPLATE string = `#### Purpose of the PR
 
 func main() {
 
-	//parse_config()
+	config := parse_config()
 	repo, err := get_repo()
 	if err != nil {
 		log.Fatal("Prego needs to be run in a Git repository !")
@@ -134,6 +135,7 @@ func main() {
 			huh.NewText().
 				Value(&PR_TEMPLATE).
 				Title("PR Description").
+				Editor(config.Editor).
 				Lines(15).
 				CharLimit(5000).
 				Description("Content of the PR"),
@@ -291,15 +293,13 @@ func publish_pr_request(url string, json_payload []byte) bool {
 	}
 }
 
-func parse_config() {
+func parse_config() ConfigPayload {
 	root_path_to_config := os.Getenv("XDG_CONFIG_HOME")
-	fmt.Println("Root path", root_path_to_config)
 	if root_path_to_config == "" {
 		root_path_to_config = os.Getenv("HOME") + "/.config"
 	}
 
-	log.Println("Root path to config", root_path_to_config)
-	path_to_config := root_path_to_config + "/prego.json"
+	path_to_config := root_path_to_config + "/prego/prego.json"
 	log.Println("Path to config", path_to_config)
 
 	config, err := os.ReadFile(path_to_config)
@@ -307,7 +307,16 @@ func parse_config() {
 		log.Println("Could not read the config file at ", path_to_config)
 	}
 
-	fmt.Println(config)
+	var config_payload ConfigPayload
 
-	os.Exit(1)
+	err = json.Unmarshal(config, &config_payload)
+	if err != nil {
+		log.Println("Something is wrong with the configuration. It could not be parsed fully.")
+	}
+
+	log.Printf("Editor is %s\n", config_payload.Editor)
+
+	return config_payload
+
+	//os.Exit(1)
 }
