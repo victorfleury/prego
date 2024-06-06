@@ -19,14 +19,12 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	//"flag"
 	"fmt"
 	"log"
 	"os"
 
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/huh/spinner"
@@ -36,9 +34,6 @@ import (
 
 const URL_TEMPLATE string = "https://bitbucket.rodeofx.com/rest/api/1.0/projects/%s/repos/%s/pull-requests"
 
-const USER_URL_TEMPLATE = "https://bitbucket.rodeofx.com/rest/api/1.0/users/vfleury/repos/home_repo/pull_requests"
-
-// fmt.Println(json_payload)
 type Reviewer struct {
 	Name string
 }
@@ -74,31 +69,15 @@ var PR_TEMPLATE string = `#### Purpose of the PR
 #### Relationship with other PRs
 `
 
-func fetch_configuration() {
-	xdg_config_home := os.Getenv("XDG_CONFIG_HOME")
-	if xdg_config_home == "" {
-		xdg_config_home = "~/.config"
-	}
-	prego_config_folder := fmt.Sprintf("%s/prego", xdg_config_home)
-	fmt.Println(prego_config_folder)
-
-	if err := os.IsNotExist(prego_config_folder); err != true {
-		fmt.Println("Config folder does not exist")
-	}
-}
 func main() {
 
-	fetch_configuration()
-	os.Exit(1)
-
+	//parse_config()
 	repo, err := get_repo()
 	if err != nil {
 		log.Fatal("Prego needs to be run in a Git repository !")
 	}
 
 	// Branches
-	//var destination_branch string
-
 	branches, err := repo.Branches()
 	if err != nil {
 		log.Fatal("No branches found. Are you in a properly initialized repository?")
@@ -110,7 +89,7 @@ func main() {
 		branch_names = append(branch_names, short_name)
 		return nil
 	})
-	//branch_names := strings.Split(string(branches), "\n")
+
 	var branch_names_cleaned []string
 	for _, b := range branch_names {
 		if b != "" {
@@ -131,6 +110,8 @@ func main() {
 	for i, reviewer := range DEFAULT_REVIEWERS {
 		reviewers_option[i] = huh.NewOption(reviewer["user"]["name"], reviewer["user"]["name"]).Selected(true)
 	}
+
+	var confirm bool
 
 	form := huh.NewForm(
 		huh.NewGroup(
@@ -154,8 +135,9 @@ func main() {
 				Value(&PR_TEMPLATE).
 				Title("PR Description").
 				Lines(15).
+				CharLimit(5000).
 				Description("Content of the PR"),
-			huh.NewConfirm().Title("Publish PR").Affirmative("Yes !").Negative("Cancel"),
+			huh.NewConfirm().Title("Publish PR").Affirmative("Yes !").Negative("Cancel").Value(&confirm),
 		),
 	)
 
@@ -166,31 +148,36 @@ func main() {
 		os.Exit(1)
 	}
 
+	if !confirm {
+		log.Println("Publish PR aborted...")
+		os.Exit(0)
+	}
+
 	_ = spinner.New().Title("Publishing PR...").Accessible(false).Action(publish_pr).Run()
 }
 
 func publish_pr() {
-	time.Sleep(1 * time.Second)
 
 	log.Println("Fetching token")
-	//token := get_token()
 	repo_url := get_repo_url()
 
 	reviewers_payload_data := build_reviewers_payload_data(reviewers)
 
 	repo, _ := get_repo()
 	head_ref, _ := repo.Head()
-	title, _ := repo.CommitObject(head_ref.Hash())
+	commit_message, _ := repo.CommitObject(head_ref.Hash())
+	title := strings.Split(commit_message.Message, "\n")[0]
 
 	json_payload := build_payload_request(
 		PR_TEMPLATE,
+		string(head_ref.Name()),
 		destination_branch,
-		title.Message,
+		title,
 		reviewers_payload_data,
 	)
 	result := publish_pr_request(repo_url, json_payload)
 	if result {
-		fmt.Println("Success !")
+		log.Println("Success !")
 	} else {
 		log.Fatal("Could not publish PR ...")
 	}
@@ -215,7 +202,7 @@ func get_token() string {
 	if err != nil {
 		log.Fatal("Panic ! No token found")
 	}
-	return string(token)
+	return strings.Trim(string(token), "\n")
 }
 
 func get_repo() (*git.Repository, error) {
@@ -248,15 +235,19 @@ func get_repo_url() string {
 
 	formatted_url := fmt.Sprintf(URL_TEMPLATE, project, strings.Split(slug_name, ".git")[0])
 
-	log.Println(formatted_url)
+	log.Println("Formattted url :", formatted_url)
 
 	return formatted_url
+	//return USER_URL_TEMPLATE
 }
 
-func build_payload_request(description, destination_branch, title string, reviewers []map[string]map[string]string) []byte {
+func build_payload_request(description, source_branch, destination_branch, title string, reviewers []map[string]map[string]string) []byte {
 
 	data := map[string]interface{}{
 		"description": description,
+		"fromRef": map[string]interface{}{
+			"id": source_branch,
+		},
 		"toRef": map[string]interface{}{
 			"id": fmt.Sprintf("refs/heads/%s", destination_branch),
 		},
@@ -276,26 +267,47 @@ func build_payload_request(description, destination_branch, title string, review
 func publish_pr_request(url string, json_payload []byte) bool {
 
 	log.Println("Publishing to ", url)
-	json_data, err := json.Marshal(json_payload)
-	if err != nil {
-		log.Fatal("Could not marshal json_payload")
-	}
 
 	client := http.Client{}
-	req, err := http.NewRequest("POST", url, bytes.NewReader(json_data))
+	req, err := http.NewRequest("POST", url, bytes.NewReader(json_payload))
 
 	req.Header = http.Header{
 		"content-type":  {"application/json"},
 		"authorization": {fmt.Sprintf("Bearer %s", get_token())},
 	}
-	fmt.Println("HEADER :", req.Header)
 	res, err := client.Do(req)
 	if err != nil {
 		log.Fatal("Could not publish PR ...", err)
 	}
-
 	defer res.Body.Close()
-	fmt.Println(res.Status)
 
-	return true
+	log.Println("Request :", res.Request)
+	log.Println("Status code of the request :", res.StatusCode)
+
+	if res.StatusCode == 201 {
+		return true
+	} else {
+		return false
+	}
+}
+
+func parse_config() {
+	root_path_to_config := os.Getenv("XDG_CONFIG_HOME")
+	fmt.Println("Root path", root_path_to_config)
+	if root_path_to_config == "" {
+		root_path_to_config = os.Getenv("HOME") + "/.config"
+	}
+
+	log.Println("Root path to config", root_path_to_config)
+	path_to_config := root_path_to_config + "/prego.json"
+	log.Println("Path to config", path_to_config)
+
+	config, err := os.ReadFile(path_to_config)
+	if err != nil {
+		log.Println("Could not read the config file at ", path_to_config)
+	}
+
+	fmt.Println(config)
+
+	os.Exit(1)
 }
