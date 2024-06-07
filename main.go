@@ -37,8 +37,9 @@ import (
 const URL_TEMPLATE string = "https://bitbucket.rodeofx.com/rest/api/1.0/projects/%s/repos/%s/pull-requests"
 
 type ConfigPayload struct {
-	Editor            string
-	Default_reviewers []map[string]map[string]string
+	Editor        string
+	All_reviewers []map[string]map[string]string
+	My_reviewers  []map[string]map[string]string
 }
 
 var (
@@ -47,25 +48,22 @@ var (
 	url                string
 	reviewers          []string
 )
-var DEFAULT_REVIEWERS = []map[string]map[string]string{
-	{"user": {"name": "bramoul"}},
-	{"user": {"name": "agjolly"}},
-	{"user": {"name": "jdubuisson"}},
-	{"user": {"name": "alima"}},
-	{"user": {"name": "lchikar"}},
-	{"user": {"name": "ldepoix"}},
-	{"user": {"name": "gnahmias"}},
-	{"user": {"name": "opeloquin"}},
-	{"user": {"name": "rpresset"}},
-}
+
+//var DEFAULT_REVIEWERS = []map[string]map[string]string{
+//{"user": {"name": "bramoul"}},
+//{"user": {"name": "agjolly"}},
+//{"user": {"name": "jdubuisson"}},
+//{"user": {"name": "alima"}},
+//{"user": {"name": "lchikar"}},
+//{"user": {"name": "ldepoix"}},
+//{"user": {"name": "gnahmias"}},
+//{"user": {"name": "opeloquin"}},
+//{"user": {"name": "rpresset"}},
+//}
 
 var PR_TEMPLATE string = `#### Purpose of the PR
 
-#### Overview of the changes
-
 #### Type of feedback wanted
-
-#### Where should the reviewer start looking at?
 
 #### Potential risks of this change
 
@@ -109,8 +107,10 @@ func main() {
 	}
 
 	// Reviewers
-	reviewers_option := make([]huh.Option[string], len(DEFAULT_REVIEWERS))
-	for i, reviewer := range DEFAULT_REVIEWERS {
+	reviewers_option := make([]huh.Option[string], len(config.All_reviewers))
+	fmt.Println(reviewers_option)
+	fmt.Println(len(config.All_reviewers))
+	for i, reviewer := range config.All_reviewers {
 		selected := reviewer_in_prefs(config, reviewer)
 		reviewers_option[i] = huh.NewOption(reviewer["user"]["name"], reviewer["user"]["name"]).Selected(selected)
 	}
@@ -161,6 +161,7 @@ func main() {
 	_ = spinner.New().Title("Publishing PR...").Accessible(false).Action(publish_pr).Run()
 }
 
+// Entrypoint for huh to publish the PR
 func publish_pr() {
 
 	log.Println("Fetching token")
@@ -189,6 +190,7 @@ func publish_pr() {
 
 }
 
+// Build the reviewers bit of the payload. Huh gives us back some string for reviewers, we need to make a slice of maps out of it.
 func build_reviewers_payload_data(reviewers []string) []map[string]map[string]string {
 	var selected_reviewers []map[string]map[string]string
 
@@ -200,6 +202,8 @@ func build_reviewers_payload_data(reviewers []string) []map[string]map[string]st
 	return selected_reviewers
 }
 
+// Get the token from the token file
+// TODO: Add it in the config and fetch it from there.
 func get_token() string {
 
 	token_path := os.Getenv("HOME") + "/token.tk"
@@ -210,6 +214,7 @@ func get_token() string {
 	return strings.Trim(string(token), "\n")
 }
 
+// Get the git repository from the current working directory
 func get_repo() (*git.Repository, error) {
 	current_directory, err := os.Getwd()
 	if err != nil {
@@ -225,13 +230,13 @@ func get_repo() (*git.Repository, error) {
 	return repo, nil
 }
 
+// Get the remote url for the repo to extract the project name and slug name so we can build the REST API request url
 func get_repo_url() string {
 	repo, _ := get_repo()
 	remotes, err := repo.Remotes()
 	if err != nil || len(remotes) == 0 {
 		log.Fatal("Repository has no remote...")
 	}
-	//fmt.Println("Remotes", remotes)
 	remote := remotes[0]
 	config_url := remote.Config().URLs[0]
 
@@ -243,9 +248,9 @@ func get_repo_url() string {
 	log.Println("Formattted url :", formatted_url)
 
 	return formatted_url
-	//return USER_URL_TEMPLATE
 }
 
+// Build the Payload for the request to the Bitbucket REST API
 func build_payload_request(description, source_branch, destination_branch, title string, reviewers []map[string]map[string]string) []byte {
 
 	data := map[string]interface{}{
@@ -269,6 +274,7 @@ func build_payload_request(description, source_branch, destination_branch, title
 	return json_payload
 }
 
+// Perform the HTTP Request to the Bitbucket REST API
 func publish_pr_request(url string, json_payload []byte) bool {
 
 	log.Println("Publishing to ", url)
@@ -296,6 +302,7 @@ func publish_pr_request(url string, json_payload []byte) bool {
 	}
 }
 
+// Parse the JSON config for prego
 func parse_config() ConfigPayload {
 	root_path_to_config := os.Getenv("XDG_CONFIG_HOME")
 	if root_path_to_config == "" {
@@ -314,17 +321,16 @@ func parse_config() ConfigPayload {
 
 	err = json.Unmarshal(config, &config_payload)
 	if err != nil {
-		log.Println("Something is wrong with the configuration. It could not be parsed fully.")
+		log.Fatal("Something is wrong with the configuration. It could not be parsed fully.")
 	}
-
-	log.Printf("Editor is %s\n", config_payload.Editor)
 
 	return config_payload
 
 }
 
+// Check if a given reviewer is in the config for default reviewers
 func reviewer_in_prefs(config ConfigPayload, reviewer map[string]map[string]string) bool {
-	for _, r := range config.Default_reviewers {
+	for _, r := range config.My_reviewers {
 		if reflect.DeepEqual(r, reviewer) {
 			return true
 		}
