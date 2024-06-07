@@ -5,13 +5,14 @@
 
 - Default reviewers :
   - Use a map for reviewers -> OK
-  - Read from a JSON config file -> TODO
+  - Read from a JSON config file -> WIP
   - Add cli arg to remove them altogether -> TODO
 
 - Use Go Git package -> OK
 - Read Token from file -> OK
-- Build payload for POST request -> Wip need to add the HEADERs
-- Execute payload successfully
+- Build payload for POST request -> OK
+- Execute payload successfully -> OK
+- Add CLI command to generate the config
 *
 */
 package main
@@ -22,6 +23,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"reflect"
 
 	"net/http"
 	"strings"
@@ -109,7 +111,8 @@ func main() {
 	// Reviewers
 	reviewers_option := make([]huh.Option[string], len(DEFAULT_REVIEWERS))
 	for i, reviewer := range DEFAULT_REVIEWERS {
-		reviewers_option[i] = huh.NewOption(reviewer["user"]["name"], reviewer["user"]["name"]).Selected(true)
+		selected := reviewer_in_prefs(config, reviewer)
+		reviewers_option[i] = huh.NewOption(reviewer["user"]["name"], reviewer["user"]["name"]).Selected(selected)
 	}
 
 	var confirm bool
@@ -318,5 +321,13 @@ func parse_config() ConfigPayload {
 
 	return config_payload
 
-	//os.Exit(1)
+}
+
+func reviewer_in_prefs(config ConfigPayload, reviewer map[string]map[string]string) bool {
+	for _, r := range config.Default_reviewers {
+		if reflect.DeepEqual(r, reviewer) {
+			return true
+		}
+	}
+	return false
 }
