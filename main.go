@@ -49,18 +49,6 @@ var (
 	reviewers          []string
 )
 
-//var DEFAULT_REVIEWERS = []map[string]map[string]string{
-//{"user": {"name": "bramoul"}},
-//{"user": {"name": "agjolly"}},
-//{"user": {"name": "jdubuisson"}},
-//{"user": {"name": "alima"}},
-//{"user": {"name": "lchikar"}},
-//{"user": {"name": "ldepoix"}},
-//{"user": {"name": "gnahmias"}},
-//{"user": {"name": "opeloquin"}},
-//{"user": {"name": "rpresset"}},
-//}
-
 var PR_TEMPLATE string = `#### Purpose of the PR
 
 #### Type of feedback wanted
@@ -69,6 +57,16 @@ var PR_TEMPLATE string = `#### Purpose of the PR
 
 #### Relationship with other PRs
 `
+
+func check(branches_name []string, name string) bool {
+	for _, b := range branches_name {
+		if name == b {
+			fmt.Println("Found")
+			return true
+		}
+	}
+	return false
+}
 
 func main() {
 
@@ -79,15 +77,18 @@ func main() {
 	}
 
 	// Branches
+	current_branch, _ := repo.Head()
 	branches, err := repo.Branches()
 	if err != nil {
 		log.Fatal("No branches found. Are you in a properly initialized repository?")
 	}
 
-	var branch_names []string
+	var branch_names = []string{"dev", "master"}
 	branches.ForEach(func(b *plumbing.Reference) error {
 		short_name := strings.Split(b.String(), "refs/heads/")[1]
-		branch_names = append(branch_names, short_name)
+		if short_name != current_branch.Name().Short() && !check(branch_names, short_name) {
+			branch_names = append(branch_names, short_name)
+		}
 		return nil
 	})
 
@@ -108,8 +109,6 @@ func main() {
 
 	// Reviewers
 	reviewers_option := make([]huh.Option[string], len(config.All_reviewers))
-	fmt.Println(reviewers_option)
-	fmt.Println(len(config.All_reviewers))
 	for i, reviewer := range config.All_reviewers {
 		selected := reviewer_in_prefs(config, reviewer)
 		reviewers_option[i] = huh.NewOption(reviewer["user"]["name"], reviewer["user"]["name"]).Selected(selected)
