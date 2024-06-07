@@ -1,4 +1,4 @@
-module github.com/victorfleury/prgo_huh
+module github.com/victorfleury/prego
 
 go 1.21.9
 
