@@ -36,12 +36,6 @@ import (
 
 const URL_TEMPLATE string = "https://bitbucket.rodeofx.com/rest/api/1.0/projects/%s/repos/%s/pull-requests"
 
-type ConfigPayload struct {
-	Editor        string
-	All_reviewers []map[string]map[string]string
-	My_reviewers  []map[string]map[string]string
-}
-
 var (
 	destination_branch string
 	title              string
@@ -61,7 +55,6 @@ var PR_TEMPLATE string = `#### Purpose of the PR
 func check(branches_name []string, name string) bool {
 	for _, b := range branches_name {
 		if name == b {
-			fmt.Println("Found")
 			return true
 		}
 	}
@@ -299,32 +292,6 @@ func publish_pr_request(url string, json_payload []byte) bool {
 	} else {
 		return false
 	}
-}
-
-// Parse the JSON config for prego
-func parse_config() ConfigPayload {
-	root_path_to_config := os.Getenv("XDG_CONFIG_HOME")
-	if root_path_to_config == "" {
-		root_path_to_config = os.Getenv("HOME") + "/.config"
-	}
-
-	path_to_config := root_path_to_config + "/prego/prego.json"
-	log.Println("Path to config", path_to_config)
-
-	config, err := os.ReadFile(path_to_config)
-	if err != nil {
-		log.Println("Could not read the config file at ", path_to_config)
-	}
-
-	var config_payload ConfigPayload
-
-	err = json.Unmarshal(config, &config_payload)
-	if err != nil {
-		log.Fatal("Something is wrong with the configuration. It could not be parsed fully.")
-	}
-
-	return config_payload
-
 }
 
 // Check if a given reviewer is in the config for default reviewers
