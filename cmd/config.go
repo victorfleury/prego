@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -80,6 +81,11 @@ func init() {
 }
 
 func config_wizard() {
+	// Get the existing configuration if any
+	path_to_config := get_config_path()
+	existing_config := get_existing_config(path_to_config)
+
+	// Editor
 	var editor string
 	// Reviewers
 	var default_config_payload ConfigPayload
@@ -90,7 +96,7 @@ func config_wizard() {
 		log.Fatal("Could not read default config from code...")
 	}
 	for i, reviewer := range default_config_payload.All_reviewers {
-		selected := reviewer_in_prefs(default_config_payload, reviewer)
+		selected := reviewer_in_prefs(default_config_payload, reviewer) || reviewer_in_prefs(existing_config, reviewer)
 		reviewers_option[i] = huh.NewOption(reviewer["user"]["name"], reviewer["user"]["name"]).Selected(selected)
 	}
 	form := huh.NewForm(
@@ -117,8 +123,6 @@ func config_wizard() {
 		os.Exit(1)
 	}
 
-	fmt.Println("Selected editor :", editor)
-
 	// Writing out the json file
 	var custom_config_payload ConfigPayload
 	custom_config_payload.Editor = editor
@@ -129,20 +133,43 @@ func config_wizard() {
 	}
 	custom_config_payload.My_reviewers = reviewers_payload
 
+	data, err := json.Marshal(custom_config_payload)
+	err = os.WriteFile(path_to_config, data, 0644)
+	if err != nil {
+		log.Fatal("Could not encore custom config", err)
+	}
+	log.Println("Configuration successfully saved at ", path_to_config)
+
+}
+
+// Read the existing config if it exists
+func get_existing_config(path string) ConfigPayload {
+
+	var existing_config ConfigPayload
+	data, err := os.ReadFile(path)
+	if err != nil {
+		log.Println("Could not read the config file from ", path)
+		return existing_config
+	}
+
+	err = json.Unmarshal(data, &existing_config)
+	if err != nil {
+		log.Fatal("Could not read existing config.... Is it properly formatted?")
+	}
+	return existing_config
+}
+
+// Get the config path.
+func get_config_path() string {
 	root_path_to_config := os.Getenv("XDG_CONFIG_HOME")
 	if root_path_to_config == "" {
 		root_path_to_config = os.Getenv("HOME") + "/.config"
 	}
 
-	fmt.Println(custom_config_payload)
+	// makedirs
+	os.Mkdir(root_path_to_config+"/prego", 0755)
 
 	path_to_config := root_path_to_config + "/prego/prego.json"
-	log.Println("Path to config", path_to_config)
-
-	data, err := json.Marshal(custom_config_payload)
-	err = os.WriteFile(path_to_config, data, 644)
-	if err != nil {
-		log.Fatal("Could not encore custom config", err)
-	}
-
+	//log.Println("Path to config", path_to_config)
+	return path_to_config
 }
