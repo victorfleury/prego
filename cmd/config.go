@@ -2,47 +2,24 @@ package cmd
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"os"
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
+
+	"github.com/victorfleury/prego/internal/utils"
 )
 
-type ConfigPayload struct {
-	Editor        string
-	All_reviewers []map[string]map[string]string
-	My_reviewers  []map[string]map[string]string
-}
-
-var default_config string = `
-{
-	"all_reviewers": [
-		{"user": {"name": "agjolly"}},
-		{"user": {"name": "akasimov"}},
-		{"user": {"name": "alima"}},
-		{"user": {"name": "bramoul"}},
-		{"user": {"name": "csarrazin"}},
-		{"user": {"name": "cslimani"}},
-		{"user": {"name": "dguillemette"}},
-		{"user": {"name": "gnahmias"}},
-		{"user": {"name": "jpepingagne"}},
-		{"user": {"name": "jdubuisson"}},
-		{"user": {"name": "ldepoix"}},
-		{"user": {"name": "lchikar"}},
-		{"user": {"name": "mapaquin"}},
-		{"user": {"name": "opeloquin"}},
-		{"user": {"name": "pviolant"}},
-		{"user": {"name": "rpresset"}},
-		{"user": {"name": "tcarpentier"}},
-		{"user": {"name": "vfleury"}}
-	]
-}`
+//type ConfigPayload struct {
+//Editor        string
+//All_reviewers []map[string]map[string]string
+//My_reviewers  []map[string]map[string]string
+//}
 
 // Parse the JSON config for prego
-func parse_config() ConfigPayload {
+func parse_config() utils.ConfigPayload {
 
 	root_path_to_config := os.Getenv("XDG_CONFIG_HOME")
 	if root_path_to_config == "" {
@@ -55,10 +32,10 @@ func parse_config() ConfigPayload {
 	config, err := os.ReadFile(path_to_config)
 	if err != nil {
 		log.Println("Could not read the config file at ", path_to_config, "Using default")
-		config = []byte(default_config)
+		config = []byte(utils.Default_config)
 	}
 
-	var config_payload ConfigPayload
+	var config_payload utils.ConfigPayload
 
 	err = json.Unmarshal(config, &config_payload)
 	if err != nil {
@@ -88,15 +65,15 @@ func config_wizard() {
 	// Editor
 	var editor string
 	// Reviewers
-	var default_config_payload ConfigPayload
+	var default_config_payload utils.ConfigPayload
 
-	err := json.Unmarshal([]byte(default_config), &default_config_payload)
+	err := json.Unmarshal([]byte(utils.Default_config), &default_config_payload)
 	reviewers_option := make([]huh.Option[string], len(default_config_payload.All_reviewers))
 	if err != nil {
 		log.Fatal("Could not read default config from code...")
 	}
 	for i, reviewer := range default_config_payload.All_reviewers {
-		selected := reviewer_in_prefs(default_config_payload, reviewer) || reviewer_in_prefs(existing_config, reviewer)
+		selected := utils.Reviewer_in_prefs(default_config_payload, reviewer) || utils.Reviewer_in_prefs(existing_config, reviewer)
 		reviewers_option[i] = huh.NewOption(reviewer["user"]["name"], reviewer["user"]["name"]).Selected(selected)
 	}
 	form := huh.NewForm(
@@ -124,7 +101,7 @@ func config_wizard() {
 	}
 
 	// Writing out the json file
-	var custom_config_payload ConfigPayload
+	var custom_config_payload utils.ConfigPayload
 	custom_config_payload.Editor = editor
 	var reviewers_payload []map[string]map[string]string
 	for _, r := range reviewers {
@@ -143,9 +120,9 @@ func config_wizard() {
 }
 
 // Read the existing config if it exists
-func get_existing_config(path string) ConfigPayload {
+func get_existing_config(path string) utils.ConfigPayload {
 
-	var existing_config ConfigPayload
+	var existing_config utils.ConfigPayload
 	data, err := os.ReadFile(path)
 	if err != nil {
 		log.Println("Could not read the config file from ", path)

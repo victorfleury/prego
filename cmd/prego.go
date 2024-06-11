@@ -1,15 +1,21 @@
 package cmd
 
 import (
+	"bytes"
+	"fmt"
 	"log"
+	"net/http"
 	"os"
-	"reflect"
 	"strings"
 
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/huh/spinner"
-	"github.com/go-git/go-git/v5"
+
+	//"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+
+	prego_git "github.com/victorfleury/prego/internal/git"
+	"github.com/victorfleury/prego/internal/utils"
 )
 
 var (
@@ -30,7 +36,7 @@ var PR_TEMPLATE string = `#### Purpose of the PR
 
 func root_prego() {
 	config := parse_config()
-	repo, err := get_repo()
+	repo, err := prego_git.Get_repo()
 	if err != nil {
 		log.Fatal("Prego needs to be run in a Git repository !")
 	}
@@ -45,7 +51,7 @@ func root_prego() {
 	var branch_names = []string{"dev", "master"}
 	branches.ForEach(func(b *plumbing.Reference) error {
 		short_name := strings.Split(b.String(), "refs/heads/")[1]
-		if short_name != current_branch.Name().Short() && !check(branch_names, short_name) {
+		if short_name != current_branch.Name().Short() && !utils.IsNameInNames(branch_names, short_name) {
 			branch_names = append(branch_names, short_name)
 		}
 		return nil
@@ -67,9 +73,16 @@ func root_prego() {
 	}
 
 	// Reviewers
-	reviewers_option := make([]huh.Option[string], len(config.All_reviewers))
-	for i, reviewer := range config.All_reviewers {
-		selected := reviewer_in_prefs(config, reviewer)
+	reviewers_option := make([]huh.Option[string], len(utils.Default_config_payload().All_reviewers))
+	fmt.Println("Config", config)
+	if config.All_reviewers == nil {
+		fmt.Println("No default reviewers in custom config.")
+		fmt.Println("all", utils.Default_config_payload().All_reviewers)
+	}
+	for i, reviewer := range utils.Default_config_payload().All_reviewers {
+		//for i, reviewer := range config.All_reviewers {
+		selected := utils.Reviewer_in_prefs(config, reviewer)
+		fmt.Println("Reviewer", reviewer["user"]["name"])
 		reviewers_option[i] = huh.NewOption(reviewer["user"]["name"], reviewer["user"]["name"]).Selected(selected)
 	}
 
@@ -120,49 +133,55 @@ func root_prego() {
 }
 
 func publish_pr() {
-	log.Println("PUBLISHING PR !!!")
-}
-func get_token() string {
+	log.Println("Publishing PR")
+	repo_url := prego_git.Get_repo_url()
 
-	token_path := os.Getenv("HOME") + "/token.tk"
-	token, err := os.ReadFile(token_path)
+	reviewers_payload_data := utils.Build_reviewers_payload_data(reviewers)
+
+	repo, _ := prego_git.Get_repo()
+	head_ref, _ := repo.Head()
+	commit_message, _ := repo.CommitObject(head_ref.Hash())
+	title := strings.Split(commit_message.Message, "\n")[0]
+
+	json_payload := utils.Build_payload_request(
+		PR_TEMPLATE,
+		string(head_ref.Name()),
+		destination_branch,
+		title,
+		reviewers_payload_data,
+	)
+	result := publish_pr_request(repo_url, json_payload)
+	if result {
+		log.Println("Success !\n")
+	} else {
+		log.Fatal("Could not publish PR ...\n")
+	}
+}
+
+// Perform the HTTP Request to the Bitbucket REST API
+func publish_pr_request(url string, json_payload []byte) bool {
+
+	log.Println("Publishing to ", url)
+
+	client := http.Client{}
+	req, err := http.NewRequest("POST", url, bytes.NewReader(json_payload))
+
+	req.Header = http.Header{
+		"content-type":  {"application/json"},
+		"authorization": {fmt.Sprintf("Bearer %s", utils.Get_token())},
+	}
+	res, err := client.Do(req)
 	if err != nil {
-		log.Fatal("Panic ! No token found")
+		log.Fatal("Could not publish PR ...", err)
 	}
-	return strings.Trim(string(token), "\n")
-}
+	defer res.Body.Close()
 
-// Get the git repository from the current working directory
-func get_repo() (*git.Repository, error) {
-	current_directory, err := os.Getwd()
-	if err != nil {
-		log.Fatal("Current directory could not be found?")
+	log.Println("Request :", res.Request)
+	log.Println("Status code of the request :", res.StatusCode)
+
+	if res.StatusCode == 201 {
+		return true
+	} else {
+		return false
 	}
-
-	options := git.PlainOpenOptions{DetectDotGit: true}
-	repo, err := git.PlainOpenWithOptions(current_directory, &options)
-	if err != nil {
-		return nil, err
-	}
-
-	return repo, nil
-}
-
-// Check if a given reviewer is in the config for default reviewers
-func reviewer_in_prefs(config ConfigPayload, reviewer map[string]map[string]string) bool {
-	for _, r := range config.My_reviewers {
-		if reflect.DeepEqual(r, reviewer) {
-			return true
-		}
-	}
-	return false
-}
-
-func check(branches_name []string, name string) bool {
-	for _, b := range branches_name {
-		if name == b {
-			return true
-		}
-	}
-	return false
 }
