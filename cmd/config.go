@@ -12,12 +12,6 @@ import (
 	"github.com/victorfleury/prego/internal/utils"
 )
 
-//type ConfigPayload struct {
-//Editor        string
-//All_reviewers []map[string]map[string]string
-//My_reviewers  []map[string]map[string]string
-//}
-
 // Parse the JSON config for prego
 func parse_config() utils.ConfigPayload {
 
@@ -27,7 +21,6 @@ func parse_config() utils.ConfigPayload {
 	}
 
 	path_to_config := root_path_to_config + "/prego/prego.json"
-	log.Println("Path to config", path_to_config)
 
 	config, err := os.ReadFile(path_to_config)
 	if err != nil {
@@ -39,7 +32,7 @@ func parse_config() utils.ConfigPayload {
 
 	err = json.Unmarshal(config, &config_payload)
 	if err != nil {
-		log.Fatal("Something is wrong with the configuration. It could not be parsed fully.")
+		log.Fatal("Something is wrong with the configuration. It could not be parsed fully.", err)
 	}
 
 	return config_payload
@@ -70,7 +63,7 @@ func config_wizard() {
 	err := json.Unmarshal([]byte(utils.Default_config), &default_config_payload)
 	reviewers_option := make([]huh.Option[string], len(default_config_payload.All_reviewers))
 	if err != nil {
-		log.Fatal("Could not read default config from code...")
+		log.Fatal("Could not read default config from code...", err)
 	}
 	for i, reviewer := range default_config_payload.All_reviewers {
 		selected := utils.Reviewer_in_prefs(default_config_payload, reviewer) || utils.Reviewer_in_prefs(existing_config, reviewer)

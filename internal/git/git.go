@@ -32,7 +32,6 @@ func Get_repo_url() string {
 	if err != nil || len(remotes) == 0 {
 		log.Fatal("Repository has no remote...")
 	}
-	//fmt.Println("Remotes", remotes)
 	remote := remotes[0]
 	config_url := remote.Config().URLs[0]
 

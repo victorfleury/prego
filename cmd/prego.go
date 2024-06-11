@@ -74,19 +74,23 @@ func root_prego() {
 
 	// Reviewers
 	reviewers_option := make([]huh.Option[string], len(utils.Default_config_payload().All_reviewers))
-	fmt.Println("Config", config)
 	if config.All_reviewers == nil {
-		fmt.Println("No default reviewers in custom config.")
-		fmt.Println("all", utils.Default_config_payload().All_reviewers)
 	}
 	for i, reviewer := range utils.Default_config_payload().All_reviewers {
 		//for i, reviewer := range config.All_reviewers {
 		selected := utils.Reviewer_in_prefs(config, reviewer)
-		fmt.Println("Reviewer", reviewer["user"]["name"])
 		reviewers_option[i] = huh.NewOption(reviewer["user"]["name"], reviewer["user"]["name"]).Selected(selected)
 	}
 
 	var confirm bool
+	editor := "vim"
+	fmt.Println("Editor", editor)
+	if os.Getenv("EDITOR") != "" {
+		editor = os.Getenv("EDITOR")
+	}
+	if config.Editor != "" {
+		editor = config.Editor
+	}
 
 	form := huh.NewForm(
 		huh.NewGroup(
@@ -109,7 +113,7 @@ func root_prego() {
 			huh.NewText().
 				Value(&PR_TEMPLATE).
 				Title("PR Description").
-				Editor(config.Editor).
+				Editor(editor).
 				Lines(15).
 				CharLimit(5000).
 				Description("Content of the PR"),
@@ -129,7 +133,11 @@ func root_prego() {
 		os.Exit(0)
 	}
 
-	_ = spinner.New().Title("Publishing PR...").Accessible(false).Action(publish_pr).Run()
+	accessible := true
+	if os.Getenv("PREGO_ACCESSIBLE") != "" {
+		accessible = false
+	}
+	_ = spinner.New().Title("Publishing PR...").Accessible(accessible).Action(publish_pr).Run()
 }
 
 func publish_pr() {
@@ -152,7 +160,7 @@ func publish_pr() {
 	)
 	result := publish_pr_request(repo_url, json_payload)
 	if result {
-		log.Println("Success !\n")
+		log.Println("Success !")
 	} else {
 		log.Fatal("Could not publish PR ...\n")
 	}

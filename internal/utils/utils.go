@@ -74,7 +74,7 @@ func Get_token() string {
 	token_path := os.Getenv("HOME") + "/token.tk"
 	token, err := os.ReadFile(token_path)
 	if err != nil {
-		log.Fatal("Panic ! No token found")
+		log.Fatal("Panic ! No token found : ", err)
 	}
 	return strings.Trim(string(token), "\n")
 }
