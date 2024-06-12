@@ -36,5 +36,6 @@ func init() {
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	// TODO: How do you pass the value of the flag to the CMD ?
+	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 	rootCmd.Flags().BoolP("empty-reviewers", "e", false, "Unselect all reviewers. Useful to create an empty PR")
 }
