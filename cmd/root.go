@@ -1,9 +1,12 @@
 package cmd
 
 import (
-	"github.com/spf13/cobra"
 	"os"
+
+	"github.com/spf13/cobra"
 )
+
+var Emtpy_reviewers bool
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -15,7 +18,9 @@ You can create a config file at ${XDG_CONFIG_HOME:HOME}/prego/prego.json`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
-		root_prego()
+		empty_reviewers := cmd.Flag("empty-reviewers").Value
+		empty_reviewers.String()
+		root_prego(empty_reviewers)
 	},
 }
 

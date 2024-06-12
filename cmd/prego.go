@@ -10,6 +10,7 @@ import (
 
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/huh/spinner"
+	"github.com/spf13/pflag"
 
 	//"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -34,7 +35,7 @@ var PR_TEMPLATE string = `#### Purpose of the PR
 #### Relationship with other PRs
 `
 
-func root_prego() {
+func root_prego(empty_reviewers pflag.Value) {
 	config := parse_config()
 	repo, err := prego_git.Get_repo()
 	if err != nil {
@@ -78,13 +79,17 @@ func root_prego() {
 	}
 	for i, reviewer := range utils.Default_config_payload().All_reviewers {
 		//for i, reviewer := range config.All_reviewers {
-		selected := utils.Reviewer_in_prefs(config, reviewer)
+		var selected bool
+		if empty_reviewers.String() == "true" {
+			selected = false
+		} else {
+			selected = utils.Reviewer_in_prefs(config, reviewer)
+		}
 		reviewers_option[i] = huh.NewOption(reviewer["user"]["name"], reviewer["user"]["name"]).Selected(selected)
 	}
 
 	var confirm bool
 	editor := "vim"
-	fmt.Println("Editor", editor)
 	if os.Getenv("EDITOR") != "" {
 		editor = os.Getenv("EDITOR")
 	}
