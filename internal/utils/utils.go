@@ -32,7 +32,7 @@ var Default_config string = `
 		{"user": {"name": "lchikar"}},
 		{"user": {"name": "mapaquin"}},
 		{"user": {"name": "opeloquin"}},
-		{"user": {"name": "pviolant"}},
+		{"user": {"name": "pviolanti"}},
 		{"user": {"name": "rpresset"}},
 		{"user": {"name": "tcarpentier"}},
 		{"user": {"name": "vfleury"}}
