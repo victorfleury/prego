@@ -26,6 +26,7 @@ func Get_repo() (*git.Repository, error) {
 	return repo, nil
 }
 
+// Get the repository URL
 func Get_repo_url() string {
 	repo, _ := Get_repo()
 	remotes, err := repo.Remotes()
@@ -43,4 +44,22 @@ func Get_repo_url() string {
 	log.Println(formatted_url)
 
 	return formatted_url
+}
+
+// Get the last commit message to use as input for the description value of the PR template
+func Get_last_commit_message() string {
+	repo, _ := Get_repo()
+
+	head, _ := repo.Head()
+
+	last_commit, err := repo.Log(&git.LogOptions{From: head.Hash()})
+	if err != nil {
+		log.Fatal("Could not retrieve last commit message...")
+	}
+
+	last_commit_object, err := last_commit.Next()
+	if err != nil {
+		log.Fatal("bu")
+	}
+	return strings.Trim(last_commit_object.Message, "\n")
 }

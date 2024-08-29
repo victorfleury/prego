@@ -27,7 +27,7 @@ var (
 )
 
 var PR_TEMPLATE string = `#### Purpose of the PR
-
+{DESCRIPTION}
 #### Type of feedback wanted
 
 #### Potential risks of this change
@@ -88,6 +88,11 @@ func root_prego(empty_reviewers pflag.Value) {
 		reviewers_option[i] = huh.NewOption(reviewer["user"]["name"], reviewer["user"]["name"]).Selected(selected)
 	}
 
+	// Update template with last message commit :
+	replacement_string := []string{"{DESCRIPTION}", prego_git.Get_last_commit_message()}
+	replacer := strings.NewReplacer(replacement_string...)
+	UPDATED_PR_TEMPLATE := replacer.Replace(PR_TEMPLATE)
+
 	var confirm bool
 	editor := "vim"
 	if os.Getenv("EDITOR") != "" {
@@ -116,12 +121,12 @@ func root_prego(empty_reviewers pflag.Value) {
 		),
 		huh.NewGroup(
 			huh.NewText().
-				Value(&PR_TEMPLATE).
 				Title("PR Description").
 				Editor(editor).
-				Lines(15).
-				CharLimit(5000).
-				Description("Content of the PR"),
+				Lines(25).
+				CharLimit(500000).
+				Description("Content of the PR").
+				Value(&UPDATED_PR_TEMPLATE),
 			huh.NewConfirm().Title("Publish PR").Affirmative("Yes !").Negative("Cancel").Value(&confirm),
 		),
 	)
