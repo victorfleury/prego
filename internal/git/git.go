@@ -17,7 +17,7 @@ func Get_repo() (*git.Repository, error) {
 		log.Fatal("Current directory could not be found?")
 	}
 
-	options := git.PlainOpenOptions{DetectDotGit: true}
+	options := git.PlainOpenOptions{DetectDotGit: true, EnableDotGitCommonDir: true}
 	repo, err := git.PlainOpenWithOptions(current_directory, &options)
 	if err != nil {
 		return nil, err

@@ -19,23 +19,14 @@ var Default_config string = `
 {
 	"all_reviewers": [
 		{"user": {"name": "agjolly"}},
-		{"user": {"name": "akasimov"}},
-		{"user": {"name": "alima"}},
 		{"user": {"name": "bramoul"}},
-		{"user": {"name": "csarrazin"}},
-		{"user": {"name": "cslimani"}},
-		{"user": {"name": "dguillemette"}},
-		{"user": {"name": "gnahmias"}},
 		{"user": {"name": "jpepingagne"}},
 		{"user": {"name": "jdubuisson"}},
-		{"user": {"name": "ldepoix"}},
-		{"user": {"name": "lchikar"}},
 		{"user": {"name": "mapaquin"}},
 		{"user": {"name": "opeloquin"}},
 		{"user": {"name": "pviolanti"}},
-		{"user": {"name": "rpresset"}},
 		{"user": {"name": "tcarpentier"}},
-		{"user": {"name": "vfleury"}}
+		{"user": {"name": "sribet"}}
 	]
 }`
 
@@ -99,7 +90,7 @@ func Build_payload_request(description, source_branch, destination_branch, title
 	if err != nil {
 		log.Fatal("Could not build JSON payload for creating PR.")
 	}
-	log.Printf("Payload: %s\n", json_payload)
+	//log.Printf("Payload: %s\n", json_payload)
 	return json_payload
 }
 

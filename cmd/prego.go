@@ -35,6 +35,8 @@ var PR_TEMPLATE string = `#### Purpose of the PR
 #### Relationship with other PRs
 `
 
+var UPDATED_PR_TEMPLATE string
+
 func root_prego(empty_reviewers pflag.Value) {
 	config := parse_config()
 	repo, err := prego_git.Get_repo()
@@ -52,7 +54,8 @@ func root_prego(empty_reviewers pflag.Value) {
 	var branch_names = []string{"dev", "master"}
 	branches.ForEach(func(b *plumbing.Reference) error {
 		short_name := strings.Split(b.String(), "refs/heads/")[1]
-		if short_name != current_branch.Name().Short() && !utils.IsNameInNames(branch_names, short_name) {
+		//if short_name != current_branch.Name().Short() && !utils.IsNameInNames(branch_names, short_name) {
+		if b.Name().Short() != current_branch.Name().Short() && !utils.IsNameInNames(branch_names, b.Name().Short()) {
 			branch_names = append(branch_names, short_name)
 		}
 		return nil
@@ -91,7 +94,7 @@ func root_prego(empty_reviewers pflag.Value) {
 	// Update template with last message commit :
 	replacement_string := []string{"{DESCRIPTION}", prego_git.Get_last_commit_message()}
 	replacer := strings.NewReplacer(replacement_string...)
-	UPDATED_PR_TEMPLATE := replacer.Replace(PR_TEMPLATE)
+	UPDATED_PR_TEMPLATE = replacer.Replace(PR_TEMPLATE)
 
 	var confirm bool
 	editor := "vim"
@@ -162,7 +165,7 @@ func publish_pr() {
 	title := strings.Split(commit_message.Message, "\n")[0]
 
 	json_payload := utils.Build_payload_request(
-		PR_TEMPLATE,
+		UPDATED_PR_TEMPLATE,
 		string(head_ref.Name()),
 		destination_branch,
 		title,
@@ -179,7 +182,7 @@ func publish_pr() {
 // Perform the HTTP Request to the Bitbucket REST API
 func publish_pr_request(url string, json_payload []byte) bool {
 
-	log.Println("Publishing to ", url)
+	log.Println("Publishing to", url)
 
 	client := http.Client{}
 	req, err := http.NewRequest("POST", url, bytes.NewReader(json_payload))
@@ -194,7 +197,7 @@ func publish_pr_request(url string, json_payload []byte) bool {
 	}
 	defer res.Body.Close()
 
-	log.Println("Request :", res.Request)
+	//log.Println("Request :", res.Request)
 	log.Println("Status code of the request :", res.StatusCode)
 
 	if res.StatusCode == 201 {
