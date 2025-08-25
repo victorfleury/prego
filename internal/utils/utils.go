@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"reflect"
+	"slices"
 	"strings"
 )
 
@@ -25,8 +26,10 @@ var Default_config string = `
 		{"user": {"name": "mapaquin"}},
 		{"user": {"name": "opeloquin"}},
 		{"user": {"name": "pviolanti"}},
+		{"user": {"name": "rbousquet"}},
 		{"user": {"name": "tcarpentier"}},
-		{"user": {"name": "sribet"}}
+		{"user": {"name": "sribet"}},
+		{"user": {"name": "nsingh"}}
 	]
 }`
 
@@ -51,12 +54,16 @@ func Reviewer_in_prefs(config ConfigPayload, reviewer map[string]map[string]stri
 
 // Check if a given branch name is in a list of branch names
 func IsNameInNames(branches_name []string, name string) bool {
-	for _, b := range branches_name {
-		if name == b {
-			return true
-		}
+	if slices.Contains(branches_name, name) {
+		return true
 	}
 	return false
+	//for _, b := range branches_name {
+	//if name == b {
+	//return true
+	//}
+	//}
+	//return false
 }
 
 // Read token information from the source file.
