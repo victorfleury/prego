@@ -2,10 +2,12 @@ package git
 
 import (
 	"fmt"
-	"github.com/go-git/go-git/v5"
 	"log"
 	"os"
+	"os/exec"
 	"strings"
+
+	"github.com/go-git/go-git/v5"
 )
 
 const URL_TEMPLATE string = "https://bitbucket.rodeofx.com/rest/api/1.0/projects/%s/repos/%s/pull-requests"
@@ -62,4 +64,22 @@ func Get_last_commit_message() string {
 		log.Fatal("bu")
 	}
 	return strings.Trim(last_commit_object.Message, "\n")
+}
+
+// Get all commits on a branch from GIT cli
+func GetCommitsInBranch(branch, dstBranch, pretty string) []string {
+	var cmd *exec.Cmd
+	if pretty == "%B" {
+		cmd = exec.Command("git", "log", branch, "--not", dstBranch, "--oneline", "--no-decorate", fmt.Sprint("--pretty=", pretty), "--reverse")
+	} else {
+		cmd = exec.Command("git", "log", branch, "--not", dstBranch, "--oneline", "--no-decorate", fmt.Sprint("--pretty=", pretty), "--reverse")
+	}
+	fmt.Println(cmd.String())
+	out, err := cmd.Output()
+	if err != nil {
+		log.Fatalf("Oh no error : %v", err)
+	}
+	lines := strings.Split(string(out[:]), "\n")
+
+	return lines
 }

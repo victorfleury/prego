@@ -80,12 +80,12 @@ func Get_token() string {
 // Build the Payload for the request to the Bitbucket REST API
 func Build_payload_request(description, source_branch, destination_branch, title string, reviewers []map[string]map[string]string) []byte {
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"description": description,
-		"fromRef": map[string]interface{}{
+		"fromRef": map[string]any{
 			"id": source_branch,
 		},
-		"toRef": map[string]interface{}{
+		"toRef": map[string]any{
 			"id": fmt.Sprintf("refs/heads/%s", destination_branch),
 		},
 		"state":     "OPEN",

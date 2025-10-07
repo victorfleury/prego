@@ -76,6 +76,13 @@ func root_prego(empty_reviewers pflag.Value) {
 		}
 	}
 
+	//commit_titles := git.Get_commits_in_branch()
+	commit_titles := prego_git.GetCommitsInBranch(current_branch.Name().Short(), "dev", "%s")
+	commit_titles_options := make([]huh.Option[string], len(commit_titles)-1)
+	for i, ct := range commit_titles[:len(commit_titles)-1] {
+		commit_titles_options[i] = huh.NewOption(ct, ct)
+	}
+
 	// Reviewers
 	reviewers_option := make([]huh.Option[string], len(utils.Default_config_payload().All_reviewers))
 	if config.All_reviewers == nil {
@@ -92,7 +99,10 @@ func root_prego(empty_reviewers pflag.Value) {
 	}
 
 	// Update template with last message commit :
-	replacement_string := []string{"{DESCRIPTION}", prego_git.Get_last_commit_message()}
+	commit_messages := prego_git.GetCommitsInBranch(current_branch.Name().Short(), "dev", "%B")
+	messages := strings.Join(commit_messages, "\n")
+	//replacement_string := []string{"{DESCRIPTION}", prego_git.Get_last_commit_message()}
+	replacement_string := []string{"{DESCRIPTION}", messages}
 	replacer := strings.NewReplacer(replacement_string...)
 	UPDATED_PR_TEMPLATE = replacer.Replace(PR_TEMPLATE)
 
@@ -121,6 +131,12 @@ func root_prego(empty_reviewers pflag.Value) {
 				Description("Pick which team members should review your PR").
 				Options(reviewers_option...).
 				Value(&reviewers),
+		),
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Choose the PR title from the commit messages :").
+				Description("PR title").Options(commit_titles_options...).
+				Value(&title),
 		),
 		huh.NewGroup(
 			huh.NewText().
@@ -161,8 +177,8 @@ func publish_pr() {
 
 	repo, _ := prego_git.Get_repo()
 	head_ref, _ := repo.Head()
-	commit_message, _ := repo.CommitObject(head_ref.Hash())
-	title := strings.Split(commit_message.Message, "\n")[0]
+	//commit_message, _ := repo.CommitObject(head_ref.Hash())
+	//title := strings.Split(commit_message.Message, "\n")[0]
 
 	json_payload := utils.Build_payload_request(
 		UPDATED_PR_TEMPLATE,
