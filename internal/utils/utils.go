@@ -29,6 +29,7 @@ var Default_config string = `
 		{"user": {"name": "rbousquet"}},
 		{"user": {"name": "tcarpentier"}},
 		{"user": {"name": "sribet"}},
+		{"user": {"name": "nfelix"}},
 		{"user": {"name": "nsingh"}}
 	]
 }`

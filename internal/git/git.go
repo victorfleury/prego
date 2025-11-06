@@ -74,7 +74,7 @@ func GetCommitsInBranch(branch, dstBranch, pretty string) []string {
 	} else {
 		cmd = exec.Command("git", "log", branch, "--not", dstBranch, "--oneline", "--no-decorate", fmt.Sprint("--pretty=", pretty), "--reverse")
 	}
-	fmt.Println(cmd.String())
+	//fmt.Println(cmd.String())
 	out, err := cmd.Output()
 	if err != nil {
 		log.Fatalf("Oh no error : %v", err)
